@@ -36,6 +36,8 @@ def main():
 def sync():
     ldap_connector = ldap.initialize(f"{config['LDAP_URI']}")
     ldap_connector.set_option(ldap.OPT_REFERRALS, 0)
+    if config['SYNCER_VALIDATE_CERTIFICATE'] == 'false':
+        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
     ldap_connector.simple_bind_s(config['LDAP_BIND_DN'], config['LDAP_BIND_DN_PASSWORD'])
 
     ldap_results = ldap_connector.search_s(config['LDAP_BASE_DN'], ldap.SCOPE_SUBTREE, 
@@ -128,7 +130,8 @@ def read_config():
         'LDAP-MAILCOW_LDAP_BIND_DN_PASSWORD',
         'LDAP-MAILCOW_API_HOST', 
         'LDAP-MAILCOW_API_KEY', 
-        'LDAP-MAILCOW_SYNC_INTERVAL'
+        'LDAP-MAILCOW_SYNC_INTERVAL',
+        'LDAP-MAILCOW_SYNCER_VALIDATE_CERTIFICATE'
     ]
 
     config = {}
