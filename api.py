@@ -1,11 +1,11 @@
 import random, string, sys
 import requests
 
-def __post_request(url, json_data):
+def __post_request(url, json_data verifyTls):
     api_url = f"{api_host}/{url}"
     headers = {'X-API-Key': api_key, 'Content-type': 'application/json'}
 
-    req = requests.post(api_url, headers=headers, json=json_data)
+    req = requests.post(api_url, headers=headers, json=json_data, verify=verifyTls)
     rsp = req.json()
     req.close()
 
@@ -18,7 +18,7 @@ def __post_request(url, json_data):
     if rsp['type'] != 'success':
         sys.exit(f"API {url}: {rsp['type']} - {rsp['msg']}")
 
-def add_user(email, name, active):
+def add_user(email, name, active, verifyTls=True):
     password = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
     json_data = {
         'local_part':email.split('@')[0],
@@ -30,9 +30,9 @@ def add_user(email, name, active):
         "quota": "3072"
     }
 
-    __post_request('api/v1/add/mailbox', json_data)
+    __post_request('api/v1/add/mailbox', json_data, verifyTls)
 
-def edit_user(email, active=None, name=None):
+def edit_user(email, active=None, name=None, verifyTls=True):
     attr = {}
     if (active is not None):
         attr['active'] = 1 if active else 0
@@ -46,10 +46,10 @@ def edit_user(email, active=None, name=None):
 
     __post_request('api/v1/edit/mailbox', json_data)
 
-def __delete_user(email):
+def __delete_user(email, verifyTls=True):
     json_data = [email]
 
-    __post_request('api/v1/delete/mailbox', json_data)
+    __post_request('api/v1/delete/mailbox', json_data, verifyTls)
 
 def check_user(email):
     url = f"{api_host}/api/v1/get/mailbox/{email}"
