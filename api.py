@@ -26,7 +26,8 @@ def add_user(email, name, active):
         'name':name,
         'password':password,
         'password2':password,
-        "active": 1 if active else 0
+        "active": 1 if active else 0,
+        "quota": "3072"
     }
 
     __post_request('api/v1/add/mailbox', json_data)
