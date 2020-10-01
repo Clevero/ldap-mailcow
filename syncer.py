@@ -51,6 +51,11 @@ def sync():
 
     filedb.session_time = datetime.datetime.now()
 
+    if config['API_VALIDATE_CERTIFICATE'] == 'false':
+        verifyTls = False
+    else
+        verifyTls = True
+
     for (email, ldap_name, ldap_active) in ldap_results:
         (db_user_exists, db_user_active) = filedb.check_user(email)
         (api_user_exists, api_user_active, api_name) = api.check_user(email)
@@ -64,7 +69,7 @@ def sync():
             unchanged = False
 
         if not api_user_exists:
-            api.add_user(email, ldap_name, ldap_active)
+            api.add_user(email, ldap_name, ldap_active, verifyTls)
             (api_user_exists, api_user_active, api_name) = (True, ldap_active, ldap_name)
             logging.info (f"Added Mailcow user: {email} (Active: {ldap_active})")
             unchanged = False
@@ -75,12 +80,12 @@ def sync():
             unchanged = False
 
         if api_user_active != ldap_active:
-            api.edit_user(email, active=ldap_active)
+            api.edit_user(email, active=ldap_active, verifyTls)
             logging.info (f"{'Activated' if ldap_active else 'Deactived'} {email} in Mailcow")
             unchanged = False
 
         if api_name != ldap_name:
-            api.edit_user(email, name=ldap_name)
+            api.edit_user(email, name=ldap_name, verifyTls)
             logging.info (f"Changed name of {email} in Mailcow to {ldap_name}")
             unchanged = False
 
@@ -88,10 +93,10 @@ def sync():
             logging.info (f"Checked user {email}, unchanged")
 
     for email in filedb.get_unchecked_active_users():
-        (api_user_exists, api_user_active, _) = api.check_user(email)
+        (api_user_exists, api_user_active, _) = api.check_user(email, verifyTls)
 
         if (api_user_active and api_user_active):
-            api.edit_user(email, active=False)
+            api.edit_user(email, active=False, verifyTls)
             logging.info (f"Deactivated user {email} in Mailcow, not found in LDAP")
         
         filedb.user_set_active_to(email, False)
@@ -131,7 +136,8 @@ def read_config():
         'LDAP-MAILCOW_API_HOST', 
         'LDAP-MAILCOW_API_KEY', 
         'LDAP-MAILCOW_SYNC_INTERVAL',
-        'LDAP-MAILCOW_SYNCER_VALIDATE_CERTIFICATE'
+        'LDAP-MAILCOW_SYNCER_VALIDATE_CERTIFICATE',
+        'LDAP-MAILCOW_API_VALIDATE_CERTIFICATE'
     ]
 
     config = {}
