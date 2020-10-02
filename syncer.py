@@ -53,7 +53,7 @@ def sync():
 
     if config['API_VALIDATE_CERTIFICATE'] == 'false':
         verifyTls = False
-    else
+    else:
         verifyTls = True
 
     for (email, ldap_name, ldap_active) in ldap_results:
