@@ -69,7 +69,7 @@ def sync():
             unchanged = False
 
         if not api_user_exists:
-            api.add_user(email, ldap_name, ldap_active, verifyTls)
+            api.add_user(email, ldap_name, ldap_active, verifyTls=verifyTls)
             (api_user_exists, api_user_active, api_name) = (True, ldap_active, ldap_name)
             logging.info (f"Added Mailcow user: {email} (Active: {ldap_active})")
             unchanged = False
@@ -80,12 +80,12 @@ def sync():
             unchanged = False
 
         if api_user_active != ldap_active:
-            api.edit_user(email, active=ldap_active, verifyTls)
+            api.edit_user(email, active=ldap_active, verifyTls=verifyTls)
             logging.info (f"{'Activated' if ldap_active else 'Deactived'} {email} in Mailcow")
             unchanged = False
 
         if api_name != ldap_name:
-            api.edit_user(email, name=ldap_name, verifyTls)
+            api.edit_user(email, name=ldap_name, verifyTls=verifyTls)
             logging.info (f"Changed name of {email} in Mailcow to {ldap_name}")
             unchanged = False
 
@@ -93,10 +93,10 @@ def sync():
             logging.info (f"Checked user {email}, unchanged")
 
     for email in filedb.get_unchecked_active_users():
-        (api_user_exists, api_user_active, _) = api.check_user(email, verifyTls)
+        (api_user_exists, api_user_active, _) = api.check_user(email, verifyTls=verifyTls)
 
         if (api_user_active and api_user_active):
-            api.edit_user(email, active=False, verifyTls)
+            api.edit_user(email, active=False, verifyTls=verifyTls)
             logging.info (f"Deactivated user {email} in Mailcow, not found in LDAP")
         
         filedb.user_set_active_to(email, False)
