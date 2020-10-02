@@ -1,7 +1,7 @@
 import random, string, sys
 import requests
 
-def __post_request(url, json_data verifyTls):
+def __post_request(url, json_data, verifyTls):
     api_url = f"{api_host}/{url}"
     headers = {'X-API-Key': api_key, 'Content-type': 'application/json'}
 
@@ -14,7 +14,7 @@ def __post_request(url, json_data verifyTls):
 
     if not "type" in rsp or not "msg" in rsp:
         sys.exit(f"API {url}: got response without type or msg from Mailcow API")
-    
+
     if rsp['type'] != 'success':
         sys.exit(f"API {url}: {rsp['type']} - {rsp['msg']}")
 
@@ -44,20 +44,20 @@ def edit_user(email, active=None, name=None, verifyTls=True):
         'attr': attr
     }
 
-    __post_request('api/v1/edit/mailbox', json_data)
+    __post_request('api/v1/edit/mailbox', json_data, verifyTls)
 
 def __delete_user(email, verifyTls=True):
     json_data = [email]
 
     __post_request('api/v1/delete/mailbox', json_data, verifyTls)
 
-def check_user(email):
+def check_user(email, verifyTls=True):
     url = f"{api_host}/api/v1/get/mailbox/{email}"
     headers = {'X-API-Key': api_key, 'Content-type': 'application/json'}
-    req = requests.get(url, headers=headers)
+    req = requests.get(url, headers=headers, verify=verifyTls)
     rsp = req.json()
     req.close()
-    
+
     if not isinstance(rsp, dict):
         sys.exit("API get/mailbox: got response of a wrong type")
 
@@ -66,5 +66,5 @@ def check_user(email):
 
     if 'active_int' not in rsp and rsp['type'] == 'error':
         sys.exit(f"API {url}: {rsp['type']} - {rsp['msg']}")
-    
+
     return (True, bool(rsp['active_int']), rsp['name'])
