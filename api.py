@@ -18,7 +18,9 @@ def __post_request(url, json_data, verifyTls):
     if rsp['type'] != 'success':
         sys.exit(f"API {url}: {rsp['type']} - {rsp['msg']}")
 
-def add_user(email, name, active, verifyTls=True):
+def add_user(email, name, active, swapTld, verifyTls=True):
+    if swapTld is not None:
+        email = email.replace(".local", swapTld)
     password = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
     json_data = {
         'local_part':email.split('@')[0],
@@ -32,7 +34,9 @@ def add_user(email, name, active, verifyTls=True):
 
     __post_request('api/v1/add/mailbox', json_data, verifyTls)
 
-def edit_user(email, active=None, name=None, verifyTls=True):
+def edit_user(email, swapTld, active=None, name=None, verifyTls=True):
+    if swapTld is not None:
+        email = email.replace(".local", swapTld)
     attr = {}
     if (active is not None):
         attr['active'] = 1 if active else 0
@@ -46,12 +50,16 @@ def edit_user(email, active=None, name=None, verifyTls=True):
 
     __post_request('api/v1/edit/mailbox', json_data, verifyTls)
 
-def __delete_user(email, verifyTls=True):
+def __delete_user(email, swapTld, verifyTls=True):
+    if swapTld is not None:
+        email = email.replace(".local", swapTld)
     json_data = [email]
 
     __post_request('api/v1/delete/mailbox', json_data, verifyTls)
 
-def check_user(email, verifyTls=True):
+def check_user(email, swapTld, verifyTls=True):
+    if swapTld is not None:
+        email = email.replace(".local", swapTld)
     url = f"{api_host}/api/v1/get/mailbox/{email}"
     headers = {'X-API-Key': api_key, 'Content-type': 'application/json'}
     req = requests.get(url, headers=headers, verify=verifyTls)
