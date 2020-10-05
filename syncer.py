@@ -9,8 +9,8 @@ from pathlib import Path
 import logging
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%d.%m.%y %H:%M:%S', level=logging.INFO)
 
-def main():    
-    global config 
+def main():
+    global config
     config = read_config()
 
     passdb_conf = read_dovecot_passdb_conf_template()
@@ -36,12 +36,12 @@ def main():
 def sync():
     ldap_connector = ldap.initialize(f"{config['LDAP_URI']}")
     ldap_connector.set_option(ldap.OPT_REFERRALS, 0)
-    if config['SYNCER_VALIDATE_CERTIFICATE'] == 'false':
+    if 'SYNCER_VALIDATE_CERTIFICATE' in config and config['SYNCER_VALIDATE_CERTIFICATE'] == 'false':
         ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
     ldap_connector.simple_bind_s(config['LDAP_BIND_DN'], config['LDAP_BIND_DN_PASSWORD'])
 
-    ldap_results = ldap_connector.search_s(config['LDAP_BASE_DN'], ldap.SCOPE_SUBTREE, 
-                config['LDAP_FILTER'], 
+    ldap_results = ldap_connector.search_s(config['LDAP_BASE_DN'], ldap.SCOPE_SUBTREE,
+                config['LDAP_FILTER'],
                 ['userPrincipalName', 'cn', 'userAccountControl'])
 
     ldap_results = map(lambda x: (
@@ -56,9 +56,14 @@ def sync():
     else:
         verifyTls = True
 
+    if 'SWAP_TLD' in config:
+        swapTld = config['SWAP_TLD']
+    else:
+        swapTld = None
+
     for (email, ldap_name, ldap_active) in ldap_results:
         (db_user_exists, db_user_active) = filedb.check_user(email)
-        (api_user_exists, api_user_active, api_name) = api.check_user(email, verifyTls=verifyTls)
+        (api_user_exists, api_user_active, api_name) = api.check_user(email, swapTld, verifyTls=verifyTls)
 
         unchanged = True
 
@@ -69,7 +74,7 @@ def sync():
             unchanged = False
 
         if not api_user_exists:
-            api.add_user(email, ldap_name, ldap_active, verifyTls=verifyTls)
+            api.add_user(email, ldap_name, ldap_active, swapTld, verifyTls=verifyTls)
             (api_user_exists, api_user_active, api_name) = (True, ldap_active, ldap_name)
             logging.info (f"Added Mailcow user: {email} (Active: {ldap_active})")
             unchanged = False
@@ -80,12 +85,12 @@ def sync():
             unchanged = False
 
         if api_user_active != ldap_active:
-            api.edit_user(email, active=ldap_active, verifyTls=verifyTls)
+            api.edit_user(email, swapTld, active=ldap_active, verifyTls=verifyTls)
             logging.info (f"{'Activated' if ldap_active else 'Deactived'} {email} in Mailcow")
             unchanged = False
 
         if api_name != ldap_name:
-            api.edit_user(email, name=ldap_name, verifyTls=verifyTls)
+            api.edit_user(email, swapTld, name=ldap_name, verifyTls=verifyTls)
             logging.info (f"Changed name of {email} in Mailcow to {ldap_name}")
             unchanged = False
 
@@ -93,12 +98,12 @@ def sync():
             logging.info (f"Checked user {email}, unchanged")
 
     for email in filedb.get_unchecked_active_users():
-        (api_user_exists, api_user_active, _) = api.check_user(email, verifyTls=verifyTls)
+        (api_user_exists, api_user_active, _) = api.check_user(email, swapTld, verifyTls=verifyTls)
 
         if (api_user_active and api_user_active):
-            api.edit_user(email, active=False, verifyTls=verifyTls)
+            api.edit_user(email, swapTld, active=False, verifyTls=verifyTls)
             logging.info (f"Deactivated user {email} in Mailcow, not found in LDAP")
-        
+
         filedb.user_set_active_to(email, False)
         logging.info (f"Deactivated user {email} in filedb, not found in LDAP")
 
@@ -123,21 +128,19 @@ def apply_config(config_file, config_data):
     Path(os.path.dirname(config_file)).mkdir(parents=True, exist_ok=True)
 
     print(config_data, file=open(config_file, 'w'))
-    
+
     logging.info(f"Saved generated config file to {config_file}")
     return True
 
 def read_config():
     required_config_keys = [
-        'LDAP-MAILCOW_LDAP_URI', 
+        'LDAP-MAILCOW_LDAP_URI',
         'LDAP-MAILCOW_LDAP_BASE_DN',
-        'LDAP-MAILCOW_LDAP_BIND_DN', 
+        'LDAP-MAILCOW_LDAP_BIND_DN',
         'LDAP-MAILCOW_LDAP_BIND_DN_PASSWORD',
-        'LDAP-MAILCOW_API_HOST', 
-        'LDAP-MAILCOW_API_KEY', 
-        'LDAP-MAILCOW_SYNC_INTERVAL',
-        'LDAP-MAILCOW_SYNCER_VALIDATE_CERTIFICATE',
-        'LDAP-MAILCOW_API_VALIDATE_CERTIFICATE'
+        'LDAP-MAILCOW_API_HOST',
+        'LDAP-MAILCOW_API_KEY',
+        'LDAP-MAILCOW_SYNC_INTERVAL'
     ]
 
     config = {}
@@ -157,6 +160,15 @@ def read_config():
     config['LDAP_FILTER'] = os.environ['LDAP-MAILCOW_LDAP_FILTER'] if 'LDAP-MAILCOW_LDAP_FILTER' in os.environ else '(&(objectClass=user)(objectCategory=person))'
     config['SOGO_LDAP_FILTER'] = os.environ['LDAP-MAILCOW_SOGO_LDAP_FILTER'] if 'LDAP-MAILCOW_SOGO_LDAP_FILTER' in os.environ else "objectClass='user' AND objectCategory='person'"
 
+    if 'LDAP-MAILCOW_SYNCER_VALIDATE_CERTIFICATE' in os.environ:
+        config['SYNCER_VALIDATE_CERTIFICATE'] = os.environ['LDAP-MAILCOW_SYNCER_VALIDATE_CERTIFICATE']
+
+    if 'LDAP-MAILCOW_API_VALIDATE_CERTIFICATE' in os.environ:
+        config['API_VALIDATE_CERTIFICATE'] = os.environ['LDAP-MAILCOW_API_VALIDATE_CERTIFICATE']
+
+    if 'LDAP-MAILCOW_SWAP_TLD' in os.environ:
+        config['SWAP_TLD'] = os.environ['LDAP-MAILCOW_SWAP_TLD']
+
     return config
 
 def read_dovecot_passdb_conf_template():
@@ -164,7 +176,7 @@ def read_dovecot_passdb_conf_template():
         data = Template(f.read())
 
     return data.substitute(
-        ldap_uri=config['LDAP_URI'], 
+        ldap_uri=config['LDAP_URI'],
         ldap_base_dn=config['LDAP_BASE_DN']
         )
 
@@ -173,7 +185,7 @@ def read_sogo_plist_ldap_template():
         data = Template(f.read())
 
     return data.substitute(
-        ldap_uri=config['LDAP_URI'], 
+        ldap_uri=config['LDAP_URI'],
         ldap_base_dn=config['LDAP_BASE_DN'],
         ldap_bind_dn=config['LDAP_BIND_DN'],
         ldap_bind_dn_password=config['LDAP_BIND_DN_PASSWORD'],
